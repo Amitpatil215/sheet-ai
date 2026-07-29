@@ -25,7 +25,7 @@ export function ChatEmpty({
               onClick={() => onPick(c)}
               className="rounded-lg border border-zinc-200 px-3 py-2 text-sm hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
             >
-              @{c.slug} — summarize sheet
+              @{c.slug}
             </button>
           ))}
         </div>
