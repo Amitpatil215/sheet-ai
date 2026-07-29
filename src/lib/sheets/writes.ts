@@ -1,5 +1,6 @@
 import { getSheetsClient, getSheetValues } from './client';
 import { detectHeaderRowIndex } from './header-detect';
+import { searchRows } from './reads';
 
 export async function appendRows(
   uid: string,
@@ -155,5 +156,46 @@ export async function alignRowsToSheet(
     headers,
     headerRow,
     values: objects.map((obj) => rowObjectToValues(headers, obj)),
+  };
+}
+
+/** Append rows after checking surroundings for potential duplicates. */
+/** Append rows after checking surroundings for potential duplicates. */
+export async function appendWithDupeCheck(
+  uid: string,
+  spreadsheetId: string,
+  worksheet: string,
+  input: Record<string, unknown>[] | string[][],
+) {
+  const firstRow = input[0]!;
+  const searchKey =
+    typeof firstRow === 'object' && !Array.isArray(firstRow)
+      ? Object.values(firstRow).filter(Boolean).slice(0, 2).join(' ')
+      : (firstRow as string[])[0] ?? '';
+
+  let duplicateWarning: string | undefined;
+  if (searchKey) {
+    const nearby = await searchRows(
+      uid, spreadsheetId, worksheet, searchKey, undefined, 2, 2,
+    );
+    if (nearby.matches?.length) {
+      duplicateWarning = `⚠️ Similar row(s) already exist near row(s) ${nearby.matches.map((m) => m.rowIndex).join(', ')}. Appended anyway.`;
+    }
+  }
+
+  // Read the last few rows so the AI sees what's right before the append point
+  const allValues = await getSheetValues(uid, spreadsheetId, `${worksheet}!A1:Z`);
+  const tailRows = (allValues ?? []).slice(-5);
+
+  const aligned = await alignRowsToSheet(uid, spreadsheetId, worksheet, input);
+  const result = await appendRows(uid, spreadsheetId, worksheet, aligned.values);
+  return {
+    ...result,
+    headers: aligned.headers,
+    duplicateWarning,
+    surroundingContext: {
+      rowsBeforeAppend: tailRows,
+      note: 'These are the last rows before the new data was appended.',
+    },
   };
 }

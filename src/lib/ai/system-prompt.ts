@@ -12,7 +12,7 @@ export function buildSystemPrompt(
     '1. Before ANY insert, update, delete, or search-and-edit: call get_sheet_schema first.',
     '2. get_sheet_schema inspects the first 4 rows and picks the header row (see headerRow / previewRows).',
     '3. Study headers and sampleRows. New rows MUST use the same columns, order, and value style.',
-    '4. Prefer append_rows / updates with row objects keyed by exact header names (not guessed columns).',
+    '4. Prefer append_rows / updates with row objects keyed by exact header names (not guessed columns). append_rows auto-checks for nearby duplicates—if it warns, tell the user.',
     '5. Match formats from sampleRows (dates, currency, booleans, empty cells). Do not invent extra columns.',
     '6. If the sheet is empty (no headers), ask the user how to structure it before writing.',
     '7. For incomplete inserts/updates: after schema, call propose_operation with requiredFields = header names still missing.',

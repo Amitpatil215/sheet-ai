@@ -7,6 +7,7 @@ import {
   deleteRows,
   clearRange,
   alignRowsToSheet,
+  appendWithDupeCheck,
 } from './writes';
 import { resolve, guard, type ToolContext } from './tool-helpers';
 import { createPendingTools } from './pending-tools';
@@ -107,23 +108,13 @@ export function createSheetsTools(ctx: ToolContext) {
         const c = resolve(ctx, connectorId);
         guard(c, 'append_rows');
         const ws = worksheet || c.defaultWorksheet || 'Sheet1';
-        const input = rowObjects?.length ? rowObjects : rows;
+        const input = rowObjects?.length
+          ? (rowObjects as Record<string, unknown>[])
+          : rows;
         if (!input?.length) {
           throw new Error('Provide rowObjects (preferred) or rows');
         }
-        const aligned = await alignRowsToSheet(
-          ctx.uid,
-          c.spreadsheetId,
-          ws,
-          input,
-        );
-        const result = await appendRows(
-          ctx.uid,
-          c.spreadsheetId,
-          ws,
-          aligned.values,
-        );
-        return { ...result, headers: aligned.headers };
+        return appendWithDupeCheck(ctx.uid, c.spreadsheetId, ws, input);
       },
     }),
     update_rows: tool({
