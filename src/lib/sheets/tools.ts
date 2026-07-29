@@ -10,7 +10,6 @@ import {
   appendWithDupeCheck,
 } from './writes';
 import { resolve, guard, type ToolContext } from './tool-helpers';
-import { createPendingTools } from './pending-tools';
 
 export type { ToolContext };
 
@@ -183,6 +182,5 @@ export function createSheetsTools(ctx: ToolContext) {
         return clearRange(ctx.uid, c.spreadsheetId, range);
       },
     }),
-    ...createPendingTools(ctx),
   };
 }

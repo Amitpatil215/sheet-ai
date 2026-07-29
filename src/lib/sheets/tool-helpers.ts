@@ -1,11 +1,9 @@
-import type { Connector, PendingOperation } from '@/lib/types';
+import type { Connector } from '@/lib/types';
 import { canUseTool, permissionRefusal } from './permissions';
 
 export interface ToolContext {
   uid: string;
   connectors: Map<string, Connector>;
-  pending: PendingOperation | null;
-  setPending: (p: PendingOperation | null) => void;
 }
 
 export function resolve(ctx: ToolContext, connectorId: string) {

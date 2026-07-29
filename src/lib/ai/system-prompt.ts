@@ -1,9 +1,6 @@
-import type { Connector, PendingOperation } from '@/lib/types';
+import type { Connector } from '@/lib/types';
 
-export function buildSystemPrompt(
-  connectors: Connector[],
-  pending: PendingOperation | null,
-): string {
+export function buildSystemPrompt(connectors: Connector[]): string {
   const today = new Date().toLocaleDateString('en-US', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
   });
@@ -19,25 +16,23 @@ export function buildSystemPrompt(
     '4. Prefer append_rows / updates with row objects keyed by exact header names (not guessed columns). append_rows auto-checks for nearby duplicates—if it warns, tell the user.',
     '5. Match formats from sampleRows (dates, currency, booleans, empty cells). Do not invent extra columns.',
     '6. If the sheet is empty (no headers), ask the user how to structure it before writing.',
-    '7. For incomplete inserts/updates: after schema, call propose_operation with requiredFields = header names still missing.',
-    '8. When the user fills gaps, call confirm_operation with additionalFields.',
-    '9. If the user says never mind / cancel, call cancel_pending.',
-    '10. If no connectors are available at all, refuse mutations. Otherwise auto-select the best connector for the user intent.',
-    '11. Be concise. Format tabular answers in markdown.',
+    '7. For incomplete inserts/updates: assume reasonable default values for missing fields based on existing data patterns. Write the row immediately and let the user know what values were assumed so they can ask for edits if needed.',
+    '8. Be concise. Format tabular answers in markdown.',
+    '9. If no connectors are available at all, refuse mutations. Otherwise auto-select the best connector for the user intent.',
     '',
     '## Suggestions (mandatory)',
-    '16. At the end of EVERY response, include a `suggestions` JSON block with 2-4 short follow-up actions the user might want. Format: ```suggestions\n["suggestion 1","suggestion 2","suggestion 3"]\n``` Each suggestion should be a complete sentence/command the user can send as-is.',
+    '10. At the end of EVERY response, include a `suggestions` JSON block with 2-4 short follow-up actions the user might want. Format: ```suggestions\n["suggestion 1","suggestion 2","suggestion 3"]\n``` Each suggestion should be a complete sentence/command the user can send as-is.',
     '',
     '## Lookup rules (mandatory)',
-    '12. Sheets often use section/label rows (dates, categories, people, statuses, etc.). The label may appear once; related items live in nearby rows until the next label.',
-    '13. For any lookup: call search_rows and read the `around` window for each match. Never answer from the matched row alone when neighboring rows hold the content.',
-    '14. If search_rows returns 0 matches, retry with a shorter/partial query (unique substring) and/or read_rows near likely areas. Do NOT tell the user nothing exists after a single failed exact search.',
-    '15. When listing items for a label/section, include rows in the match window that belong to that section (typically below the label until the next similar label).',
+    '11. Sheets often use section/label rows (dates, categories, people, statuses, etc.). The label may appear once; related items live in nearby rows until the next label.',
+    '12. For any lookup: call search_rows and read the `around` window for each match. Never answer from the matched row alone when neighboring rows hold the content.',
+    '13. If search_rows returns 0 matches, retry with a shorter/partial query (unique substring) and/or read_rows near likely areas. Do NOT tell the user nothing exists after a single failed exact search.',
+    '14. When listing items for a label/section, include rows in the match window that belong to that section (typically below the label until the next similar label).',
   ];
 
   if (!connectors.length) {
     lines.push(
-      'No connectors are available. Answer without sheet tools unless the user is continuing a pending operation.',
+      'No connectors are available. Answer without sheet tools.',
     );
   } else {
     lines.push('Available connectors:');
@@ -51,15 +46,6 @@ export function buildSystemPrompt(
     lines.push('');
     lines.push(
       '## Auto-selection rule: If the user did not explicitly tag a connector, infer the best connector from their intent using the connector name, description, and worksheet context. If ambiguous, ask the user which connector to use.',
-    );
-  }
-
-  if (pending) {
-    lines.push(
-      `Active pending operation: intent=${pending.intent} connectorId=${pending.connectorId} missing=[${pending.missingFields.join(', ')}] partial=${JSON.stringify(pending.partialRow)}`,
-    );
-    lines.push(
-      'Continue collecting missing fields using existing header names; do not start a new unrelated write unless the user cancels.',
     );
   }
 

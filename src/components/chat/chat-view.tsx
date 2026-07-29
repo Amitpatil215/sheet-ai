@@ -34,7 +34,6 @@ export function ChatView({ chatId, initialChat, initialMessages = [] }: Props) {
   const [templates, setTemplates] = useState<PromptTemplate[]>([]);
   const [input, setInput] = useState('');
   const [model, setModel] = useState(initialChat?.model || '');
-  const [pending, setPending] = useState(initialChat?.pendingOperation ?? null);
   const [creating, setCreating] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [title, setTitle] = useState(initialChat?.title || 'New chat');
@@ -94,7 +93,6 @@ export function ChatView({ chatId, initialChat, initialMessages = [] }: Props) {
       );
       try {
         const d = await apiFetch(`/api/chats/${id}`);
-        setPending(d.chat.pendingOperation ?? null);
         if (d.chat?.title) setTitle(d.chat.title);
       } catch {
         /* ignore */
@@ -147,16 +145,6 @@ export function ChatView({ chatId, initialChat, initialMessages = [] }: Props) {
         },
       },
     );
-  };
-
-  const cancelPending = async () => {
-    const id = resolvedChatId();
-    if (!id) return;
-    await apiFetch(`/api/chats/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ pendingOperation: null }),
-    });
-    setPending(null);
   };
 
   const lastMessage = messages[messages.length - 1];
@@ -251,18 +239,6 @@ export function ChatView({ chatId, initialChat, initialMessages = [] }: Props) {
       {displayError && (
         <div className="mx-4 mb-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
           {displayError}
-        </div>
-      )}
-
-      {pending && (
-        <div className="mx-4 mb-2 flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-100">
-          <span>
-            Pending {pending.intent}: missing{' '}
-            {pending.missingFields.join(', ') || 'none (ready)'}
-          </span>
-          <Button variant="ghost" size="sm" onClick={() => void cancelPending()}>
-            <X className="h-3.5 w-3.5" /> Cancel
-          </Button>
         </div>
       )}
 

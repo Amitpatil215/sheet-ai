@@ -1,6 +1,6 @@
 import type { Permission } from '@/lib/types';
 
-const WRITE_OPS = new Set(['append_rows', 'update_rows', 'delete_rows', 'clear_range', 'propose_operation', 'confirm_operation']);
+const WRITE_OPS = new Set(['append_rows', 'update_rows', 'delete_rows', 'clear_range']);
 
 const TIER_RANK: Record<Permission, number> = {
   read: 0,
@@ -17,9 +17,6 @@ const TOOL_MIN_TIER: Record<string, Permission> = {
   update_rows: 'read_insert_update',
   delete_rows: 'full_crud',
   clear_range: 'full_crud',
-  propose_operation: 'read_insert',
-  confirm_operation: 'read_insert',
-  cancel_pending: 'read',
 };
 
 export function canUseTool(permission: Permission, toolName: string): boolean {

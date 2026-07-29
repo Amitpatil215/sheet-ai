@@ -6,7 +6,6 @@ import {
 import { requireUid, userRef, jsonError } from '@/lib/firebase/auth';
 import { runChatAgent } from '@/lib/ai/agent';
 import { nowIso, DEFAULT_MODEL } from '@/lib/utils';
-import type { PendingOperation } from '@/lib/types';
 
 export const maxDuration = 60;
 
@@ -42,7 +41,6 @@ export async function POST(req: NextRequest) {
     }
 
     const chatData = chatSnap.data()!;
-    let pending = (chatData.pendingOperation as PendingOperation | null) ?? null;
 
     const lastUser = [...messages].reverse().find((m) => m.role === 'user');
     if (lastUser) {
@@ -72,10 +70,6 @@ export async function POST(req: NextRequest) {
       messages: coreMessages,
       connectorIds,
       model: modelId,
-      pending,
-      onPendingChange: (p) => {
-        pending = p;
-      },
     });
 
     return result.toUIMessageStreamResponse({
@@ -89,10 +83,7 @@ export async function POST(req: NextRequest) {
               createdAt: nowIso(),
             }),
           );
-          await chatRef.update({
-            pendingOperation: pending ?? null,
-            updatedAt: nowIso(),
-          });
+          await chatRef.update({ updatedAt: nowIso() });
         } catch (err) {
           console.error('Failed to persist assistant message', err);
         }

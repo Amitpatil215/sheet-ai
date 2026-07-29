@@ -25,7 +25,6 @@ export async function runAutomationOnce(uid: string, automationId: string) {
       updatedAt: now,
       source: 'automation' as const,
       automationId,
-      pendingOperation: null,
       searchablePreview: auto.prompt.slice(0, 200),
     };
     const chatRef = await userRef(uid).collection('chats').add(chatData);
@@ -35,16 +34,11 @@ export async function runAutomationOnce(uid: string, automationId: string) {
       createdAt: now,
     });
 
-    let pending = null;
     const result = await runAutomationAgent({
       uid,
       messages: [{ role: 'user', content: auto.prompt }],
       connectorIds: auto.connectorIds ?? [],
       model: auto.model,
-      pending,
-      onPendingChange: (p) => {
-        pending = p;
-      },
     });
 
     await chatRef.collection('messages').add({
@@ -53,7 +47,6 @@ export async function runAutomationOnce(uid: string, automationId: string) {
       createdAt: nowIso(),
     });
     await chatRef.update({
-      pendingOperation: pending,
       updatedAt: nowIso(),
       searchablePreview: result.text.slice(0, 200),
     });

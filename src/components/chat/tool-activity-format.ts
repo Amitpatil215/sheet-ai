@@ -30,9 +30,6 @@ const TOOL_TITLES: Record<string, string> = {
   update_rows: 'Update row',
   delete_rows: 'Delete rows',
   clear_range: 'Clear range',
-  propose_operation: 'Propose change',
-  confirm_operation: 'Confirm change',
-  cancel_pending: 'Cancel pending',
 };
 
 function titleFor(name: string): string {
@@ -82,19 +79,6 @@ function summarizeOutput(name: string, output: unknown): string[] {
   }
   if (name === 'clear_range' && o.cleared) {
     lines.push('Range cleared');
-  }
-  if (name === 'propose_operation' || name === 'confirm_operation') {
-    const status = str(o.status);
-    const intent = str(o.intent);
-    if (intent) lines.push(`Intent: ${intent}`);
-    if (status) lines.push(`Status: ${status}`);
-    const missing = o.missingFields;
-    if (Array.isArray(missing) && missing.length) {
-      lines.push(`Missing: ${missing.join(', ')}`);
-    }
-  }
-  if (name === 'cancel_pending') {
-    lines.push('Pending operation cancelled');
   }
   if (!lines.length && str(o.error)) {
     lines.push(String(o.error));

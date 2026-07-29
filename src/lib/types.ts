@@ -1,7 +1,5 @@
 export type Permission = 'read' | 'read_insert' | 'read_insert_update' | 'full_crud';
 
-export type PendingIntent = 'insert' | 'update' | 'delete';
-
 export interface UserPreferences {
   defaultModel: string;
   theme: 'light' | 'dark' | 'system';
@@ -37,15 +35,6 @@ export interface PromptTemplate {
   sortOrder: number;
 }
 
-export interface PendingOperation {
-  connectorId: string;
-  intent: PendingIntent;
-  partialRow: Record<string, unknown>;
-  requiredFields: string[];
-  missingFields: string[];
-  createdAt: string;
-}
-
 export interface Chat {
   id: string;
   title: string;
@@ -54,7 +43,6 @@ export interface Chat {
   updatedAt: string;
   source: 'user' | 'automation';
   automationId?: string;
-  pendingOperation?: PendingOperation | null;
   searchablePreview?: string;
 }
 
