@@ -26,12 +26,21 @@ export async function updateRows(
   values: string[],
 ) {
   const sheets = await getSheetsClient(uid);
+  // Read existing row so we only overwrite provided cells
+  const existing = await getSheetValues(
+    uid,
+    spreadsheetId,
+    `${worksheet}!A${rowIndex}:Z${rowIndex}`,
+  );
+  const current = existing?.[0] ?? [];
+  // Merge: keep existing cell value when new value is empty
+  const merged = values.map((v, i) => (v !== '' ? v : (current[i] ?? '')));
   const range = `${worksheet}!A${rowIndex}:Z${rowIndex}`;
   await sheets.spreadsheets.values.update({
     spreadsheetId,
     range,
     valueInputOption: 'USER_ENTERED',
-    requestBody: { values: [values] },
+    requestBody: { values: [merged] },
   });
   return { rowIndex, updated: true };
 }
