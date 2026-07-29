@@ -82,10 +82,18 @@ export interface ChatMessage {
 }
 
 export type SchedulePreset =
-  | 'daily'
-  | 'weekly_monday_9am'
-  | 'every_night'
+  | 'every_1m'
+  | 'every_5m'
+  | 'every_10m'
+  | 'every_15m'
+  | 'every_30m'
   | 'hourly'
+  | 'every_2h'
+  | 'every_6h'
+  | 'every_12h'
+  | 'daily'
+  | 'every_night'
+  | 'weekly_monday_9am'
   | 'custom';
 
 export interface Automation {

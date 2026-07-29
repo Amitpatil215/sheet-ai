@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Card } from '@/components/ui/tabs';
-import { scheduleLabel } from '@/lib/automations/schedule';
+import { scheduleLabel, SCHEDULE_OPTIONS } from '@/lib/automations/schedule';
 import type { Automation, Connector, SchedulePreset } from '@/lib/types';
 import { Play, Trash2 } from 'lucide-react';
 
@@ -104,10 +104,11 @@ export function AutomationsPanel() {
             value={schedule}
             onChange={(e) => setSchedule(e.target.value as SchedulePreset)}
           >
-            <option value="daily">Daily</option>
-            <option value="hourly">Hourly</option>
-            <option value="every_night">Every night</option>
-            <option value="weekly_monday_9am">Weekly Monday 9am</option>
+            {SCHEDULE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
           </Select>
         </div>
         <div>
