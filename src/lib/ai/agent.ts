@@ -1,19 +1,11 @@
 import { streamText, generateText, stepCountIs, type ModelMessage } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
-import { decrypt } from '@/lib/crypto';
 import { userRef } from '@/lib/firebase/auth';
 import type { Connector, PendingOperation } from '@/lib/types';
 import { createSheetsTools, type ToolContext } from '@/lib/sheets/tools';
 import { buildSystemPrompt } from './system-prompt';
 import { DEFAULT_MODEL } from '@/lib/utils';
-
-async function getOpenRouterKey(uid: string): Promise<string> {
-  const snap = await userRef(uid).collection('secrets').doc('openrouter').get();
-  if (!snap.exists) {
-    throw new Error('OpenRouter API key not configured. Add it in Settings → General.');
-  }
-  return decrypt(snap.data()!.apiKey as string);
-}
+import { getOpenRouterKey } from '@/lib/openrouter/key';
 
 export async function loadConnectors(
   uid: string,

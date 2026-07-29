@@ -59,9 +59,20 @@ export interface Chat {
 }
 
 export type MessagePart =
-  | { type: 'text'; text: string }
-  | { type: 'tool-call'; toolCallId: string; toolName: string; args: unknown }
-  | { type: 'tool-result'; toolCallId: string; toolName: string; result: unknown };
+  | { type: 'text'; text: string; state?: string }
+  | { type: 'reasoning'; text: string; state?: string }
+  | { type: 'step-start' }
+  | {
+      type: string;
+      toolCallId?: string;
+      toolName?: string;
+      state?: string;
+      input?: unknown;
+      output?: unknown;
+      errorText?: string;
+      args?: unknown;
+      result?: unknown;
+    };
 
 export interface ChatMessage {
   id: string;

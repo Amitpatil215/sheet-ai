@@ -28,13 +28,17 @@ export function nowIso(): string {
 
 export const DEFAULT_MODEL = 'openai/gpt-4o-mini';
 
-export const MODEL_OPTIONS = [
+/** Used when OpenRouter model list cannot be loaded. */
+export const FALLBACK_MODELS = [
   { id: 'openai/gpt-4o-mini', label: 'GPT-4o Mini' },
   { id: 'openai/gpt-4o', label: 'GPT-4o' },
   { id: 'anthropic/claude-3.5-sonnet', label: 'Claude 3.5 Sonnet' },
   { id: 'google/gemini-2.0-flash-001', label: 'Gemini 2.0 Flash' },
   { id: 'meta-llama/llama-3.3-70b-instruct', label: 'Llama 3.3 70B' },
 ] as const;
+
+/** @deprecated Use ModelPicker + OpenRouter API */
+export const MODEL_OPTIONS = FALLBACK_MODELS;
 
 export const PERMISSION_LABELS: Record<string, string> = {
   read: 'Read only',

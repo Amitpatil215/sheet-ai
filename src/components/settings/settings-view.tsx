@@ -12,7 +12,8 @@ import { Select } from '@/components/ui/select';
 import { Tabs, Card } from '@/components/ui/tabs';
 import { ConnectorsPanel } from '@/components/settings/connectors-panel';
 import { AutomationsPanel } from '@/components/settings/automations-panel';
-import { MODEL_OPTIONS } from '@/lib/utils';
+import { ModelPicker } from '@/components/models/model-picker';
+import { DEFAULT_MODEL } from '@/lib/utils';
 
 export function SettingsView() {
   const { apiFetch } = useApi();
@@ -20,7 +21,7 @@ export function SettingsView() {
   const { theme, setTheme } = useTheme();
   const params = useSearchParams();
   const [tab, setTab] = useState('general');
-  const [defaultModel, setDefaultModel] = useState<string>(MODEL_OPTIONS[0].id);
+  const [defaultModel, setDefaultModel] = useState<string>(DEFAULT_MODEL);
   const [apiKey, setApiKey] = useState('');
   const [orConfigured, setOrConfigured] = useState(false);
   const [google, setGoogle] = useState<{
@@ -41,7 +42,7 @@ export function SettingsView() {
 
   useEffect(() => {
     void apiFetch('/api/preferences').then((d) => {
-      setDefaultModel(d.preferences?.defaultModel || MODEL_OPTIONS[0].id);
+      setDefaultModel(d.preferences?.defaultModel || DEFAULT_MODEL);
       setOrConfigured(d.openrouter?.configured);
       setGoogle(d.google);
       if (d.preferences?.theme) setTheme(d.preferences.theme);
@@ -133,18 +134,12 @@ export function SettingsView() {
           </div>
           <div>
             <Label htmlFor="model">Default model</Label>
-            <Select
+            <ModelPicker
               id="model"
               className="mt-1"
               value={defaultModel}
-              onChange={(e) => setDefaultModel(e.target.value)}
-            >
-              {MODEL_OPTIONS.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.label}
-                </option>
-              ))}
-            </Select>
+              onChange={setDefaultModel}
+            />
           </div>
           <div>
             <Label htmlFor="theme">Theme</Label>

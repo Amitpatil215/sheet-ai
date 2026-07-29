@@ -7,15 +7,16 @@ import { Send, Loader2, X } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { useApi } from '@/hooks/use-api';
 import { Button } from '@/components/ui/button';
-import { Select } from '@/components/ui/select';
+import { ModelPicker } from '@/components/models/model-picker';
 import { Markdown } from '@/components/chat/markdown';
+import { MessageActivity } from '@/components/chat/message-activity';
 import {
   MentionPopover,
   parseTaggedConnectors,
 } from '@/components/chat/mention-popover';
 import { ChatEmpty } from '@/components/chat/chat-empty';
-import { MODEL_OPTIONS } from '@/lib/utils';
 import type { Chat, ChatMessage, Connector, PromptTemplate } from '@/lib/types';
+import type { UIMessage } from 'ai';
 
 interface Props {
   /** Omit for a draft chat — persisted only after the first message. */
@@ -82,7 +83,7 @@ export function ChatView({ chatId, initialChat, initialMessages = [] }: Props) {
     messages: initialMessages.map((m) => ({
       id: m.id,
       role: m.role as 'user' | 'assistant',
-      parts: m.parts as { type: 'text'; text: string }[],
+      parts: m.parts as UIMessage['parts'],
     })),
     onFinish: async () => {
       clearError();
@@ -167,18 +168,13 @@ export function ChatView({ chatId, initialChat, initialMessages = [] }: Props) {
     <div className="flex h-full flex-col">
       <header className="flex items-center justify-between border-b border-zinc-200 px-4 py-2 dark:border-zinc-800">
         <h1 className="truncate text-sm font-medium">{title}</h1>
-        <Select
-          className="w-48"
+        <ModelPicker
+          className="w-56 shrink-0"
           value={model}
-          onChange={(e) => setModel(e.target.value)}
-        >
-          <option value="">Default model</option>
-          {MODEL_OPTIONS.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.label}
-            </option>
-          ))}
-        </Select>
+          onChange={setModel}
+          allowEmpty
+          emptyLabel="Default model"
+        />
       </header>
 
       <div className="flex-1 space-y-4 overflow-y-auto px-4 py-6">
@@ -196,6 +192,9 @@ export function ChatView({ chatId, initialChat, initialMessages = [] }: Props) {
             .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
             .map((p) => p.text)
             .join('\n');
+          const isLast = m.id === lastMessage?.id;
+          const showThinking =
+            busy && isLast && m.role === 'assistant' && !text.trim();
           return (
             <div
               key={m.id}
@@ -210,12 +209,23 @@ export function ChatView({ chatId, initialChat, initialMessages = [] }: Props) {
                     : 'rounded-2xl bg-zinc-100 px-4 py-3 text-sm dark:bg-zinc-900'
                 }
               >
-                {m.role === 'user' ? text : <Markdown content={text} />}
+                {m.role === 'assistant' && (
+                  <MessageActivity parts={m.parts} />
+                )}
+                {m.role === 'user' ? (
+                  text
+                ) : text.trim() ? (
+                  <Markdown content={text} />
+                ) : showThinking ? (
+                  <div className="flex items-center gap-2 text-zinc-400">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Working…
+                  </div>
+                ) : null}
               </div>
             </div>
           );
         })}
-        {busy && (
+        {busy && lastMessage?.role !== 'assistant' && (
           <div className="flex items-center gap-2 text-sm text-zinc-400">
             <Loader2 className="h-4 w-4 animate-spin" /> Thinking…
           </div>
