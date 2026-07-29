@@ -21,6 +21,13 @@ export async function loadConnectors(
   return results;
 }
 
+/** Load all enabled connectors for auto-selection when none are explicitly tagged. */
+export async function loadAllConnectors(uid: string): Promise<Connector[]> {
+  const col = userRef(uid).collection('connectors');
+  const snap = await col.where('enabled', '==', true).get();
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Connector);
+}
+
 export interface AgentInput {
   uid: string;
   messages: ModelMessage[];
@@ -33,7 +40,11 @@ export interface AgentInput {
 export async function runChatAgent(input: AgentInput) {
   const apiKey = await getOpenRouterKey(input.uid);
   const openrouter = createOpenRouter({ apiKey });
-  const connectors = await loadConnectors(input.uid, input.connectorIds);
+  // If user explicitly tagged connectors, use those; otherwise load all enabled
+  // connectors so the AI can intelligently pick the right one.
+  const connectors = input.connectorIds.length
+    ? await loadConnectors(input.uid, input.connectorIds)
+    : await loadAllConnectors(input.uid);
   const map = new Map(connectors.map((c) => [c.id, c]));
   // Allow pending connector even if not re-tagged
   if (input.pending && !map.has(input.pending.connectorId)) {

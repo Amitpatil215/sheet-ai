@@ -18,7 +18,7 @@ export function buildSystemPrompt(
     '7. For incomplete inserts/updates: after schema, call propose_operation with requiredFields = header names still missing.',
     '8. When the user fills gaps, call confirm_operation with additionalFields.',
     '9. If the user says never mind / cancel, call cancel_pending.',
-    '10. Refuse mutations when no connectors are tagged. Plain Q&A without tools is allowed.',
+    '10. If no connectors are available at all, refuse mutations. Otherwise auto-select the best connector for the user intent.',
     '11. Be concise. Format tabular answers in markdown.',
     '',
     '## Lookup rules (mandatory)',
@@ -30,10 +30,10 @@ export function buildSystemPrompt(
 
   if (!connectors.length) {
     lines.push(
-      'No connectors are tagged for this turn. Answer without sheet tools unless the user is continuing a pending operation.',
+      'No connectors are available. Answer without sheet tools unless the user is continuing a pending operation.',
     );
   } else {
-    lines.push('Tagged connectors:');
+    lines.push('Available connectors:');
     for (const c of connectors) {
       lines.push(
         `- id=${c.id} name="${c.name}" slug=@${c.slug} spreadsheetId=${c.spreadsheetId} worksheet=${c.defaultWorksheet || 'Sheet1'} permission=${c.permission}`,
@@ -41,6 +41,10 @@ export function buildSystemPrompt(
       if (c.description) lines.push(`  description: ${c.description}`);
       if (c.systemPrompt) lines.push(`  instructions: ${c.systemPrompt}`);
     }
+    lines.push('');
+    lines.push(
+      '## Auto-selection rule: If the user did not explicitly tag a connector, infer the best connector from their intent using the connector name, description, and worksheet context. If ambiguous, ask the user which connector to use.',
+    );
   }
 
   if (pending) {
