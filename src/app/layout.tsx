@@ -11,8 +11,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'AI Sheets',
-  description: 'ChatGPT-like workspace for Google Sheets',
+  title: 'Eva',
+  description: 'Your personal assistant — chat, sheets, and automations',
 };
 
 export default function RootLayout({

@@ -77,7 +77,7 @@ export function MentionPopover({
           onSubmit?.();
         }}
         rows={3}
-        placeholder="Message AI Sheets… Type @ to tag a connector"
+        placeholder="Message Eva… Type @ to tag a connector"
         className="w-full resize-none rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-zinc-700 dark:bg-zinc-900"
       />
       {mention && filtered.length > 0 && (

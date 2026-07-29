@@ -3,6 +3,8 @@ export type Permission = 'read' | 'read_insert' | 'read_insert_update' | 'full_c
 export interface UserPreferences {
   defaultModel: string;
   theme: 'light' | 'dark' | 'system';
+  /** Freeform context the AI uses to know and assist the user. */
+  personalInfo?: string;
 }
 
 export interface UserProfile {

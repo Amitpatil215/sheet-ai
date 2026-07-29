@@ -12,6 +12,7 @@ import { Select } from '@/components/ui/select';
 import { Tabs, Card } from '@/components/ui/tabs';
 import { ConnectorsPanel } from '@/components/settings/connectors-panel';
 import { AutomationsPanel } from '@/components/settings/automations-panel';
+import { PersonalInfoPanel } from '@/components/settings/personal-info-panel';
 import { ModelPicker } from '@/components/models/model-picker';
 import { DEFAULT_MODEL } from '@/lib/utils';
 
@@ -91,12 +92,13 @@ export function SettingsView() {
     <div className="mx-auto max-w-3xl p-6">
       <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
       <p className="mt-1 text-sm text-zinc-500">
-        Manage keys, Google Sheets, connectors, and automations.
+        Manage Eva, keys, Google Sheets, connectors, and automations.
       </p>
       <div className="mt-6">
         <Tabs
           tabs={[
             { id: 'general', label: 'General' },
+            { id: 'about', label: 'About you' },
             { id: 'google', label: 'Google' },
             { id: 'connectors', label: 'Connectors' },
             { id: 'automations', label: 'Automations' },
@@ -158,6 +160,19 @@ export function SettingsView() {
             {saving ? 'Saving…' : 'Save'}
           </Button>
         </Card>
+      )}
+
+      {tab === 'about' && (
+        <PersonalInfoPanel
+          onSaved={(m) => {
+            setMsg(m);
+            setErr(null);
+          }}
+          onError={(m) => {
+            setErr(m);
+            setMsg(null);
+          }}
+        />
       )}
 
       {tab === 'google' && (

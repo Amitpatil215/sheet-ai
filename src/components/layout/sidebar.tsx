@@ -102,7 +102,7 @@ export function Sidebar() {
     <aside className="flex w-64 flex-col border-r border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950">
       <div className="flex items-center justify-between p-3">
         <Link href="/" className="text-sm font-semibold tracking-tight">
-          AI Sheets
+          Eva
         </Link>
         <Button variant="ghost" size="icon" onClick={() => setCollapsed(true)}>
           <PanelLeftClose className="h-4 w-4" />

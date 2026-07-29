@@ -12,9 +12,10 @@ export function ChatEmpty({
   const enabled = connectors.filter((c) => c.enabled);
   return (
     <div className="mx-auto max-w-lg py-16 text-center">
-      <h2 className="text-xl font-semibold tracking-tight">AI Sheets</h2>
+      <h2 className="text-xl font-semibold tracking-tight">Eva</h2>
       <p className="mt-2 text-sm text-zinc-500">
-        Tag a connector with @ and ask to read, insert, update, or delete rows.
+        Your personal assistant — chat about anything, or tag a connector with @
+        to work in your sheets.
       </p>
       {enabled.length > 0 ? (
         <div className="mt-6 flex flex-wrap justify-center gap-2">
@@ -31,7 +32,7 @@ export function ChatEmpty({
         </div>
       ) : (
         <p className="mt-6 text-sm text-zinc-400">
-          Add a connector in Settings to get started.
+          Add a connector in Settings, or just say hi — Eva chats either way.
         </p>
       )}
     </div>

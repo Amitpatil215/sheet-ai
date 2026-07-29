@@ -1,7 +1,7 @@
 import { streamText, generateText, stepCountIs, type ModelMessage } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { userRef } from '@/lib/firebase/auth';
-import type { Connector } from '@/lib/types';
+import type { Connector, UserPreferences } from '@/lib/types';
 import { createSheetsTools, type ToolContext } from '@/lib/sheets/tools';
 import { buildSystemPrompt } from './system-prompt';
 import { DEFAULT_MODEL } from '@/lib/utils';
@@ -28,6 +28,15 @@ export async function loadAllConnectors(uid: string): Promise<Connector[]> {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Connector);
 }
 
+async function loadUserContext(uid: string) {
+  const data = (await userRef(uid).get()).data();
+  const prefs = (data?.preferences ?? {}) as UserPreferences;
+  return {
+    displayName: typeof data?.displayName === 'string' ? data.displayName : undefined,
+    personalInfo: prefs.personalInfo,
+  };
+}
+
 export interface AgentInput {
   uid: string;
   messages: ModelMessage[];
@@ -42,6 +51,7 @@ export async function runChatAgent(input: AgentInput) {
     ? await loadConnectors(input.uid, input.connectorIds)
     : await loadAllConnectors(input.uid);
   const map = new Map(connectors.map((c) => [c.id, c]));
+  const userCtx = await loadUserContext(input.uid);
 
   const ctx: ToolContext = {
     uid: input.uid,
@@ -53,7 +63,10 @@ export async function runChatAgent(input: AgentInput) {
 
   return streamText({
     model: openrouter(modelId),
-    system: buildSystemPrompt([...map.values()]),
+    system: buildSystemPrompt({
+      connectors: [...map.values()],
+      ...userCtx,
+    }),
     messages: input.messages,
     tools,
     stopWhen: stepCountIs(8),
@@ -66,13 +79,17 @@ export async function runAutomationAgent(input: AgentInput) {
   const openrouter = createOpenRouter({ apiKey });
   const connectors = await loadConnectors(input.uid, input.connectorIds);
   const map = new Map(connectors.map((c) => [c.id, c]));
+  const userCtx = await loadUserContext(input.uid);
   const ctx: ToolContext = {
     uid: input.uid,
     connectors: map,
   };
   const result = await generateText({
     model: openrouter(input.model || DEFAULT_MODEL),
-    system: buildSystemPrompt([...map.values()]),
+    system: buildSystemPrompt({
+      connectors: [...map.values()],
+      ...userCtx,
+    }),
     messages: input.messages,
     tools: createSheetsTools(ctx),
     stopWhen: stepCountIs(8),

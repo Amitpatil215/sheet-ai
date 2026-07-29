@@ -40,9 +40,6 @@ export async function PATCH(req: NextRequest) {
     const body = await req.json();
     const updates: Record<string, unknown> = { updatedAt: nowIso() };
 
-    if (body.preferences) {
-      updates.preferences = body.preferences;
-    }
     if (body.displayName !== undefined) updates.displayName = body.displayName;
 
     // Ensure user doc exists
@@ -54,12 +51,17 @@ export async function PATCH(req: NextRequest) {
         displayName: body.displayName ?? '',
         photoURL: body.photoURL ?? '',
         createdAt: nowIso(),
-        preferences: body.preferences ?? {
+        preferences: {
           defaultModel: DEFAULT_MODEL,
           theme: 'system',
+          ...(body.preferences ?? {}),
         },
       });
     } else {
+      if (body.preferences) {
+        const existing = (snap.data()?.preferences ?? {}) as UserPreferences;
+        updates.preferences = { ...existing, ...body.preferences };
+      }
       await ref.update(updates);
     }
 
