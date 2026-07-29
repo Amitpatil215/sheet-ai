@@ -164,6 +164,20 @@ export function ChatView({ chatId, initialChat, initialMessages = [] }: Props) {
     submitError ||
     (error && lastMessage?.role !== 'assistant' ? error.message : null);
 
+  /** Extract suggestions JSON from the last assistant message. */
+  const suggestions = (() => {
+    if (busy) return [];
+    const last = messages.filter((m) => m.role === 'assistant').pop();
+    if (!last) return [];
+    const text = (last.parts ?? [])
+      .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
+      .map((p) => p.text)
+      .join('\n');
+    const match = text.match(/```suggestions\n(\[[\s\S]*?\])\n```/);
+    if (!match) return [];
+    try { return JSON.parse(match[1]) as string[]; } catch { return []; }
+  })();
+
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center justify-between border-b border-zinc-200 px-4 py-2 dark:border-zinc-800">
@@ -191,7 +205,9 @@ export function ChatView({ chatId, initialChat, initialMessages = [] }: Props) {
           const text = (m.parts ?? [])
             .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
             .map((p) => p.text)
-            .join('\n');
+            .join('\n')
+            .replace(/```suggestions\n\[[\s\S]*?\]\n```/g, '')
+            .trim();
           const isLast = m.id === lastMessage?.id;
           const showThinking =
             busy && isLast && m.role === 'assistant' && !text.trim();
@@ -247,6 +263,21 @@ export function ChatView({ chatId, initialChat, initialMessages = [] }: Props) {
           <Button variant="ghost" size="sm" onClick={() => void cancelPending()}>
             <X className="h-3.5 w-3.5" /> Cancel
           </Button>
+        </div>
+      )}
+
+      {suggestions.length > 0 && (
+        <div className="mx-4 mb-2 flex flex-wrap gap-2">
+          {suggestions.map((s) => (
+            <button
+              key={s}
+              type="button"
+              className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs text-zinc-700 transition hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+              onClick={() => { setInput(s); }}
+            >
+              {s}
+            </button>
+          ))}
         </div>
       )}
 
