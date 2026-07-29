@@ -2,7 +2,7 @@
 
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Send, Loader2, X } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { useApi } from '@/hooks/use-api';
@@ -18,7 +18,8 @@ import { MODEL_OPTIONS } from '@/lib/utils';
 import type { Chat, ChatMessage, Connector, PromptTemplate } from '@/lib/types';
 
 interface Props {
-  chatId: string;
+  /** Omit for a draft chat — persisted only after the first message. */
+  chatId?: string;
   initialChat?: Chat;
   initialMessages?: ChatMessage[];
 }
@@ -26,12 +27,16 @@ interface Props {
 export function ChatView({ chatId, initialChat, initialMessages = [] }: Props) {
   const { getIdToken } = useAuth();
   const { apiFetch } = useApi();
+  const draftChatId = useRef<string | null>(null);
   const [connectors, setConnectors] = useState<Connector[]>([]);
   const [selected, setSelected] = useState<Connector[]>([]);
   const [templates, setTemplates] = useState<PromptTemplate[]>([]);
   const [input, setInput] = useState('');
   const [model, setModel] = useState(initialChat?.model || '');
   const [pending, setPending] = useState(initialChat?.pendingOperation ?? null);
+  const [creating, setCreating] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [title, setTitle] = useState(initialChat?.title || 'New chat');
 
   useEffect(() => {
     let cancelled = false;
@@ -63,8 +68,10 @@ export function ChatView({ chatId, initialChat, initialMessages = [] }: Props) {
     };
   }, [selected, apiFetch]);
 
+  const resolvedChatId = () => chatId || draftChatId.current;
+
   const { messages, sendMessage, status, error, clearError } = useChat({
-    id: chatId,
+    id: chatId || 'draft',
     transport: new DefaultChatTransport({
       api: '/api/chat',
       headers: async () => {
@@ -78,30 +85,61 @@ export function ChatView({ chatId, initialChat, initialMessages = [] }: Props) {
       parts: m.parts as { type: 'text'; text: string }[],
     })),
     onFinish: async () => {
+      const id = resolvedChatId();
+      if (!id) return;
+      window.dispatchEvent(
+        new CustomEvent('aisheets:chats-changed', { detail: { id } }),
+      );
       try {
-        const d = await apiFetch(`/api/chats/${chatId}`);
+        const d = await apiFetch(`/api/chats/${id}`);
         setPending(d.chat.pendingOperation ?? null);
+        if (d.chat?.title) setTitle(d.chat.title);
       } catch {
         /* ignore */
       }
     },
   });
 
-  const busy = status === 'submitted' || status === 'streaming';
+  const busy = status === 'submitted' || status === 'streaming' || creating;
 
   const onSubmit = async () => {
     if (!input.trim() || busy) return;
     clearError();
+    setSubmitError(null);
     const text = input;
     const tagged = parseTaggedConnectors(text, connectors);
     const chips = selected.map((c) => c.id);
     const connectorIds = [...new Set([...tagged, ...chips])];
     setInput('');
+    if (title === 'New chat' && text.trim()) {
+      setTitle(text.trim().slice(0, 60));
+    }
+
+    let id = resolvedChatId();
+    if (!id) {
+      setCreating(true);
+      try {
+        const chat = await apiFetch('/api/chats', {
+          method: 'POST',
+          body: JSON.stringify({ model: model || undefined }),
+        });
+        id = chat.id as string;
+        draftChatId.current = id;
+        // Stay on the draft page — any route change remounts and kills streaming.
+      } catch (e) {
+        setInput(text);
+        setSubmitError(e instanceof Error ? e.message : 'Could not create chat');
+        return;
+      } finally {
+        setCreating(false);
+      }
+    }
+
     await sendMessage(
       { text },
       {
         body: {
-          chatId,
+          chatId: id,
           connectorIds,
           model: model || undefined,
         },
@@ -110,19 +148,21 @@ export function ChatView({ chatId, initialChat, initialMessages = [] }: Props) {
   };
 
   const cancelPending = async () => {
-    await apiFetch(`/api/chats/${chatId}`, {
+    const id = resolvedChatId();
+    if (!id) return;
+    await apiFetch(`/api/chats/${id}`, {
       method: 'PATCH',
       body: JSON.stringify({ pendingOperation: null }),
     });
     setPending(null);
   };
 
+  const displayError = submitError || error?.message;
+
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center justify-between border-b border-zinc-200 px-4 py-2 dark:border-zinc-800">
-        <h1 className="truncate text-sm font-medium">
-          {initialChat?.title || 'Chat'}
-        </h1>
+        <h1 className="truncate text-sm font-medium">{title}</h1>
         <Select
           className="w-48"
           value={model}
@@ -178,9 +218,9 @@ export function ChatView({ chatId, initialChat, initialMessages = [] }: Props) {
         )}
       </div>
 
-      {error && (
+      {displayError && (
         <div className="mx-4 mb-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
-          {error.message}
+          {displayError}
         </div>
       )}
 
@@ -225,6 +265,7 @@ export function ChatView({ chatId, initialChat, initialMessages = [] }: Props) {
           }
           templates={templates}
           onTemplate={(body) => setInput((v) => (v ? `${v}\n${body}` : body))}
+          onSubmit={() => void onSubmit()}
         />
         <div className="mt-2 flex justify-end">
           <Button onClick={() => void onSubmit()} disabled={busy || !input.trim()}>

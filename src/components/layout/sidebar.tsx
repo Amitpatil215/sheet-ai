@@ -54,12 +54,19 @@ export function Sidebar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
 
-  const newChat = async () => {
-    const chat = await apiFetch('/api/chats', {
-      method: 'POST',
-      body: JSON.stringify({}),
-    });
-    router.push(`/chat/${chat.id}`);
+  useEffect(() => {
+    const onChatsChanged = () => {
+      if (user) void load(query);
+    };
+    window.addEventListener('aisheets:chats-changed', onChatsChanged);
+    return () =>
+      window.removeEventListener('aisheets:chats-changed', onChatsChanged);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, query]);
+
+  const newChat = () => {
+    // Fresh draft each time; query key remounts ChatView when already on home.
+    router.push(`/?new=${Date.now()}`);
   };
 
   const rename = async (id: string) => {
@@ -84,7 +91,7 @@ export function Sidebar() {
         <Button variant="ghost" size="icon" onClick={() => setCollapsed(false)}>
           <PanelLeft className="h-4 w-4" />
         </Button>
-        <Button variant="ghost" size="icon" onClick={() => void newChat()}>
+        <Button variant="ghost" size="icon" onClick={newChat}>
           <MessageSquarePlus className="h-4 w-4" />
         </Button>
       </aside>
@@ -102,7 +109,7 @@ export function Sidebar() {
         </Button>
       </div>
       <div className="px-3">
-        <Button className="w-full" onClick={() => void newChat()}>
+        <Button className="w-full" onClick={newChat}>
           <MessageSquarePlus className="h-4 w-4" /> New chat
         </Button>
       </div>

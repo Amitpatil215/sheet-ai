@@ -11,7 +11,15 @@ export async function GET(req: NextRequest) {
       .orderBy('updatedAt', 'desc')
       .limit(100)
       .get();
-    let chats = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    // Only list chats that have at least one message (skip abandoned drafts).
+    let chats = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .filter((c) => {
+        const preview = String(
+          (c as { searchablePreview?: string }).searchablePreview ?? '',
+        ).trim();
+        return preview.length > 0;
+      });
     if (q) {
       chats = chats.filter((c) => {
         const title = String((c as { title?: string }).title ?? '').toLowerCase();

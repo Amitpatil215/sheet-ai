@@ -10,6 +10,7 @@ interface Props {
   onSelectConnector: (c: Connector) => void;
   templates: PromptTemplate[];
   onTemplate: (body: string) => void;
+  onSubmit?: () => void;
 }
 
 /** Composer @-mention autocomplete for connectors. */
@@ -20,6 +21,7 @@ export function MentionPopover({
   onSelectConnector,
   templates,
   onTemplate,
+  onSubmit,
 }: Props) {
   const ref = useRef<HTMLTextAreaElement>(null);
 
@@ -68,6 +70,12 @@ export function MentionPopover({
         ref={ref}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
+          if (e.shiftKey) return; // Shift+Enter → new line
+          e.preventDefault();
+          onSubmit?.();
+        }}
         rows={3}
         placeholder="Message AI Sheets… Type @ to tag a connector"
         className="w-full resize-none rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-zinc-700 dark:bg-zinc-900"
