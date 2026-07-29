@@ -9,7 +9,7 @@ import {
   deleteRows,
   clearRange,
   headersFor,
-  rowObjectToValues,
+  alignRowsToSheet,
 } from './writes';
 import { nowIso } from '@/lib/utils';
 
@@ -36,7 +36,8 @@ function guard(c: Connector, toolName: string) {
 export function createSheetsTools(ctx: ToolContext) {
   return {
     get_sheet_schema: tool({
-      description: 'Get headers, sample rows, and sheet names for a connector',
+      description:
+        'REQUIRED before any write. Returns headers, sampleRows, columnFormats, and format guidance.',
       inputSchema: z.object({
         connectorId: z.string(),
         worksheet: z.string().optional(),
@@ -48,7 +49,7 @@ export function createSheetsTools(ctx: ToolContext) {
       },
     }),
     read_rows: tool({
-      description: 'Read rows from a worksheet',
+      description: 'Read rows from a worksheet (existing data)',
       inputSchema: z.object({
         connectorId: z.string(),
         worksheet: z.string().optional(),
@@ -63,7 +64,7 @@ export function createSheetsTools(ctx: ToolContext) {
       },
     }),
     search_rows: tool({
-      description: 'Search rows by text query',
+      description: 'Search existing rows by text query',
       inputSchema: z.object({
         connectorId: z.string(),
         query: z.string(),
@@ -78,36 +79,68 @@ export function createSheetsTools(ctx: ToolContext) {
       },
     }),
     append_rows: tool({
-      description: 'Append one or more rows (array of value arrays matching headers)',
+      description:
+        'Append rows matching existing headers. Prefer rowObjects keyed by exact header names. Call get_sheet_schema first.',
       inputSchema: z.object({
         connectorId: z.string(),
         worksheet: z.string().optional(),
-        rows: z.array(z.array(z.string())),
+        rowObjects: z
+          .array(z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])))
+          .optional()
+          .describe('Preferred: objects keyed by header names'),
+        rows: z
+          .array(z.array(z.string()))
+          .optional()
+          .describe('Legacy: cell arrays in header order'),
       }),
-      execute: async ({ connectorId, worksheet, rows }) => {
+      execute: async ({ connectorId, worksheet, rowObjects, rows }) => {
         const c = resolve(ctx, connectorId);
         guard(c, 'append_rows');
         const ws = worksheet || c.defaultWorksheet || 'Sheet1';
-        return appendRows(ctx.uid, c.spreadsheetId, ws, rows);
+        const input = rowObjects?.length ? rowObjects : rows;
+        if (!input?.length) {
+          throw new Error('Provide rowObjects (preferred) or rows');
+        }
+        const aligned = await alignRowsToSheet(ctx.uid, c.spreadsheetId, ws, input);
+        const result = await appendRows(ctx.uid, c.spreadsheetId, ws, aligned.values);
+        return { ...result, headers: aligned.headers };
       },
     }),
     update_rows: tool({
-      description: 'Update a row by 1-based row index',
+      description:
+        'Update a row by 1-based row index. Prefer rowObject keyed by headers. Call get_sheet_schema first.',
       inputSchema: z.object({
         connectorId: z.string(),
         rowIndex: z.number(),
-        values: z.array(z.string()),
         worksheet: z.string().optional(),
+        rowObject: z
+          .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
+          .optional(),
+        values: z.array(z.string()).optional(),
       }),
-      execute: async ({ connectorId, rowIndex, values, worksheet }) => {
+      execute: async ({ connectorId, rowIndex, values, rowObject, worksheet }) => {
         const c = resolve(ctx, connectorId);
         guard(c, 'update_rows');
         const ws = worksheet || c.defaultWorksheet || 'Sheet1';
-        return updateRows(ctx.uid, c.spreadsheetId, ws, rowIndex, values);
+        const input = rowObject
+          ? [rowObject]
+          : values
+            ? [values]
+            : null;
+        if (!input) throw new Error('Provide rowObject (preferred) or values');
+        const aligned = await alignRowsToSheet(ctx.uid, c.spreadsheetId, ws, input);
+        const result = await updateRows(
+          ctx.uid,
+          c.spreadsheetId,
+          ws,
+          rowIndex,
+          aligned.values[0]!,
+        );
+        return { ...result, headers: aligned.headers };
       },
     }),
     delete_rows: tool({
-      description: 'Delete rows by 1-based inclusive start/end index',
+      description: 'Delete rows by 1-based inclusive start/end index. Prefer search_rows first.',
       inputSchema: z.object({
         connectorId: z.string(),
         startIndex: z.number(),
@@ -135,7 +168,7 @@ export function createSheetsTools(ctx: ToolContext) {
     }),
     propose_operation: tool({
       description:
-        'Propose an incomplete insert/update/delete; stores pending state and lists missing fields',
+        'Propose incomplete insert/update/delete after get_sheet_schema. requiredFields must be exact header names.',
       inputSchema: z.object({
         connectorId: z.string(),
         intent: z.enum(['insert', 'update', 'delete']),
@@ -145,14 +178,37 @@ export function createSheetsTools(ctx: ToolContext) {
       execute: async ({ connectorId, intent, partialRow, requiredFields }) => {
         const c = resolve(ctx, connectorId);
         guard(c, 'propose_operation');
-        const missing = requiredFields.filter(
-          (f) => partialRow[f] === undefined || partialRow[f] === '' || partialRow[f] === null,
+        const ws = c.defaultWorksheet || 'Sheet1';
+        const headersResult = await headersFor(ctx.uid, c.spreadsheetId, ws);
+        const headers = headersResult.headers;
+        if (!headers.length || headers.every((h) => !h.trim())) {
+          throw new Error(
+            'Sheet has no headers. Ask the user how to structure columns before proposing a write.',
+          );
+        }
+        const headerSet = new Set(headers.map((h) => h.toLowerCase()));
+        const normalizedRequired = requiredFields.length
+          ? requiredFields
+          : headers.filter((h) => h.trim());
+        const bad = normalizedRequired.filter(
+          (f) => !f.startsWith('_') && !headerSet.has(f.toLowerCase()),
+        );
+        if (bad.length) {
+          throw new Error(
+            `requiredFields must match headers. Invalid: [${bad.join(', ')}]. Use: ${headers.join(', ')}`,
+          );
+        }
+        const missing = normalizedRequired.filter(
+          (f) =>
+            partialRow[f] === undefined ||
+            partialRow[f] === '' ||
+            partialRow[f] === null,
         );
         const pending: PendingOperation = {
           connectorId,
           intent,
           partialRow,
-          requiredFields,
+          requiredFields: normalizedRequired,
           missingFields: missing,
           createdAt: nowIso(),
         };
@@ -160,6 +216,8 @@ export function createSheetsTools(ctx: ToolContext) {
         return {
           status: missing.length ? 'awaiting_fields' : 'ready',
           missingFields: missing,
+          headers,
+          headerRow: headersResult.headerRow,
           pending,
         };
       },
@@ -183,20 +241,28 @@ export function createSheetsTools(ctx: ToolContext) {
         }
         const ws = c.defaultWorksheet || 'Sheet1';
         if (ctx.pending.intent === 'insert') {
-          const headers = await headersFor(ctx.uid, c.spreadsheetId, ws);
-          const values = rowObjectToValues(headers, merged);
-          const result = await appendRows(ctx.uid, c.spreadsheetId, ws, [values]);
+          const aligned = await alignRowsToSheet(ctx.uid, c.spreadsheetId, ws, [
+            merged,
+          ]);
+          const result = await appendRows(ctx.uid, c.spreadsheetId, ws, aligned.values);
           ctx.setPending(null);
-          return { status: 'committed', intent: 'insert', result };
+          return { status: 'committed', intent: 'insert', result, headers: aligned.headers };
         }
         if (ctx.pending.intent === 'update') {
           const rowIndex = Number(merged._rowIndex);
           if (!rowIndex) throw new Error('Update requires _rowIndex in partialRow');
-          const headers = await headersFor(ctx.uid, c.spreadsheetId, ws);
-          const values = rowObjectToValues(headers, merged);
-          const result = await updateRows(ctx.uid, c.spreadsheetId, ws, rowIndex, values);
+          const aligned = await alignRowsToSheet(ctx.uid, c.spreadsheetId, ws, [
+            merged,
+          ]);
+          const result = await updateRows(
+            ctx.uid,
+            c.spreadsheetId,
+            ws,
+            rowIndex,
+            aligned.values[0]!,
+          );
           ctx.setPending(null);
-          return { status: 'committed', intent: 'update', result };
+          return { status: 'committed', intent: 'update', result, headers: aligned.headers };
         }
         const startIndex = Number(merged._rowIndex);
         if (!startIndex) throw new Error('Delete requires _rowIndex');

@@ -1,4 +1,5 @@
 import { getSheetsClient, getSheetValues } from './client';
+import { detectHeaderRowIndex } from './header-detect';
 
 export async function appendRows(
   uid: string,
@@ -79,18 +80,80 @@ export async function clearRange(
   return { cleared: range };
 }
 
+/** Resolve headers by scanning the first 4 rows for the best header candidate. */
 export async function headersFor(
   uid: string,
   spreadsheetId: string,
   worksheet: string,
-): Promise<string[]> {
-  const rows = await getSheetValues(uid, spreadsheetId, `${worksheet}!A1:Z1`);
-  return (rows[0] ?? []).map(String);
+): Promise<{ headers: string[]; headerRow: number }> {
+  const rows = await getSheetValues(uid, spreadsheetId, `${worksheet}!A1:Z4`);
+  const detected = detectHeaderRowIndex(rows, 4);
+  return { headers: detected.headers, headerRow: detected.headerRow };
 }
 
 export function rowObjectToValues(
   headers: string[],
   row: Record<string, unknown>,
 ): string[] {
-  return headers.map((h) => String(row[h] ?? ''));
+  return headers.map((h) => {
+    if (h && row[h] !== undefined && row[h] !== null) return String(row[h]);
+    const key = Object.keys(row).find(
+      (k) => k.toLowerCase() === h.toLowerCase(),
+    );
+    return key != null ? String(row[key] ?? '') : '';
+  });
+}
+
+/** Align incoming rows to existing headers; reject unknown columns / empty sheets. */
+export async function alignRowsToSheet(
+  uid: string,
+  spreadsheetId: string,
+  worksheet: string,
+  rows: Record<string, unknown>[] | string[][],
+): Promise<{ headers: string[]; values: string[][]; headerRow: number }> {
+  const { headers, headerRow } = await headersFor(uid, spreadsheetId, worksheet);
+  if (!headers.length || headers.every((h) => !h.trim())) {
+    throw new Error(
+      'Sheet has no headers. Ask the user how to structure columns before writing.',
+    );
+  }
+  if (!rows.length) throw new Error('No rows to write');
+
+  if (Array.isArray(rows[0])) {
+    const arrays = rows as string[][];
+    for (const r of arrays) {
+      if (r.length > headers.length) {
+        throw new Error(
+          `Row has ${r.length} cells but sheet has ${headers.length} headers: ${headers.join(', ')}`,
+        );
+      }
+    }
+    return {
+      headers,
+      headerRow,
+      values: arrays.map((r) => {
+        const padded = [...r.map(String)];
+        while (padded.length < headers.length) padded.push('');
+        return padded.slice(0, headers.length);
+      }),
+    };
+  }
+
+  const objects = rows as Record<string, unknown>[];
+  const headerSet = new Set(headers.map((h) => h.toLowerCase()));
+  for (const obj of objects) {
+    const unknown = Object.keys(obj).filter(
+      (k) => !k.startsWith('_') && !headerSet.has(k.toLowerCase()),
+    );
+    if (unknown.length) {
+      throw new Error(
+        `Unknown columns [${unknown.join(', ')}]. Use only: ${headers.join(', ')}`,
+      );
+    }
+  }
+  return {
+    headers,
+    headerRow,
+    values: objects.map((obj) => rowObjectToValues(headers, obj)),
+  };
 }
