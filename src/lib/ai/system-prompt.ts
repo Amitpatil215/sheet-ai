@@ -4,8 +4,12 @@ export function buildSystemPrompt(
   connectors: Connector[],
   pending: PendingOperation | null,
 ): string {
+  const today = new Date().toLocaleDateString('en-US', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+  });
   const lines: string[] = [
     'You are AI Sheets, an assistant that helps users work with Google Spreadsheets via named connectors.',
+    `Today's date: ${today}.`,
     'Only use tools against connectors listed below.',
     '',
     '## Sheet format rules (mandatory)',
