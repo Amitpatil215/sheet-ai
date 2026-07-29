@@ -82,21 +82,61 @@ export async function readRows(
   return { worksheet, startRow, rows };
 }
 
+function rowToObject(
+  row: string[],
+  headers: string[],
+): Record<string, string> {
+  const obj: Record<string, string> = {};
+  headers.forEach((h, j) => {
+    obj[h || `col_${j}`] = String(row[j] ?? '');
+  });
+  return obj;
+}
+
+function windowAround(
+  rows: string[][],
+  headers: string[],
+  matchIdx: number,
+  before: number,
+  after: number,
+) {
+  const start = Math.max(0, matchIdx - before);
+  const end = Math.min(rows.length - 1, matchIdx + after);
+  const around: { rowIndex: number; isMatch: boolean; row: Record<string, string> }[] =
+    [];
+  for (let i = start; i <= end; i++) {
+    around.push({
+      rowIndex: i + 1,
+      isMatch: i === matchIdx,
+      row: rowToObject(rows[i]!, headers),
+    });
+  }
+  return { startRow: start + 1, endRow: end + 1, around };
+}
+
 export async function searchRows(
   uid: string,
   spreadsheetId: string,
   worksheet: string,
   query: string,
   column?: string,
+  contextBefore = 5,
+  contextAfter = 15,
 ) {
   const rows = await getSheetValues(uid, spreadsheetId, `${worksheet}!A:Z`);
-  if (!rows.length) return { matches: [] };
+  if (!rows.length) return { matches: [], guidance: 'Sheet is empty.' };
   const detected = detectHeaderRowIndex(rows, 4);
   const headerIdx = detected.headerRow - 1;
   const headers = detected.headers;
   const colIdx = column ? headers.findIndex((h) => h === column) : -1;
   const q = query.toLowerCase();
-  const matches: { rowIndex: number; row: Record<string, string> }[] = [];
+  const matches: {
+    rowIndex: number;
+    row: Record<string, string>;
+    startRow: number;
+    endRow: number;
+    around: { rowIndex: number; isMatch: boolean; row: Record<string, string> }[];
+  }[] = [];
   for (let i = headerIdx + 1; i < rows.length; i++) {
     const row = rows[i]!;
     const hay =
@@ -104,12 +144,22 @@ export async function searchRows(
         ? String(row[colIdx] ?? '')
         : row.map(String).join(' ');
     if (hay.toLowerCase().includes(q)) {
-      const obj: Record<string, string> = {};
-      headers.forEach((h, j) => {
-        obj[h || `col_${j}`] = String(row[j] ?? '');
+      const win = windowAround(rows, headers, i, contextBefore, contextAfter);
+      matches.push({
+        rowIndex: i + 1,
+        row: rowToObject(row, headers),
+        ...win,
       });
-      matches.push({ rowIndex: i + 1, row: obj });
     }
   }
-  return { matches: matches.slice(0, 50), headerRow: detected.headerRow };
+  return {
+    matches: matches.slice(0, 50),
+    headerRow: detected.headerRow,
+    contextBefore,
+    contextAfter,
+    guidance:
+      matches.length === 0
+        ? 'No exact hits. Retry with a shorter/partial query (unique substring) before concluding nothing exists.'
+        : 'Matched rows may be section labels only. Related items are often in `around` rows above/below until the next label. Prefer that window over saying not found.',
+  };
 }

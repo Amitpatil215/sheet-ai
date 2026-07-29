@@ -20,6 +20,12 @@ export function buildSystemPrompt(
     '9. If the user says never mind / cancel, call cancel_pending.',
     '10. Refuse mutations when no connectors are tagged. Plain Q&A without tools is allowed.',
     '11. Be concise. Format tabular answers in markdown.',
+    '',
+    '## Lookup rules (mandatory)',
+    '12. Sheets often use section/label rows (dates, categories, people, statuses, etc.). The label may appear once; related items live in nearby rows until the next label.',
+    '13. For any lookup: call search_rows and read the `around` window for each match. Never answer from the matched row alone when neighboring rows hold the content.',
+    '14. If search_rows returns 0 matches, retry with a shorter/partial query (unique substring) and/or read_rows near likely areas. Do NOT tell the user nothing exists after a single failed exact search.',
+    '15. When listing items for a label/section, include rows in the match window that belong to that section (typically below the label until the next similar label).',
   ];
 
   if (!connectors.length) {
