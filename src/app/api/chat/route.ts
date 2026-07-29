@@ -10,6 +10,11 @@ import type { PendingOperation } from '@/lib/types';
 
 export const maxDuration = 60;
 
+/** Firestore rejects `undefined`; strip it before writes. */
+function forFirestore<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const uid = await requireUid(req);
@@ -76,15 +81,21 @@ export async function POST(req: NextRequest) {
     return result.toUIMessageStreamResponse({
       originalMessages: messages,
       onFinish: async ({ responseMessage }) => {
-        await chatRef.collection('messages').add({
-          role: 'assistant',
-          parts: responseMessage.parts ?? [],
-          createdAt: nowIso(),
-        });
-        await chatRef.update({
-          pendingOperation: pending,
-          updatedAt: nowIso(),
-        });
+        try {
+          await chatRef.collection('messages').add(
+            forFirestore({
+              role: 'assistant',
+              parts: responseMessage.parts ?? [],
+              createdAt: nowIso(),
+            }),
+          );
+          await chatRef.update({
+            pendingOperation: pending ?? null,
+            updatedAt: nowIso(),
+          });
+        } catch (err) {
+          console.error('Failed to persist assistant message', err);
+        }
       },
     });
   } catch (err) {

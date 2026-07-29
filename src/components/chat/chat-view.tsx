@@ -85,6 +85,7 @@ export function ChatView({ chatId, initialChat, initialMessages = [] }: Props) {
       parts: m.parts as { type: 'text'; text: string }[],
     })),
     onFinish: async () => {
+      clearError();
       const id = resolvedChatId();
       if (!id) return;
       window.dispatchEvent(
@@ -157,7 +158,10 @@ export function ChatView({ chatId, initialChat, initialMessages = [] }: Props) {
     setPending(null);
   };
 
-  const displayError = submitError || error?.message;
+  const lastMessage = messages[messages.length - 1];
+  const displayError =
+    submitError ||
+    (error && lastMessage?.role !== 'assistant' ? error.message : null);
 
   return (
     <div className="flex h-full flex-col">
